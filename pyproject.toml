@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "your-name" },
+    { name = "AtharvPS13", email = "fake34811289@gmail.com" },
 ]
 keywords = ["code-review", "github-action", "ai", "sandbox", "static-analysis"]
 classifiers = [
