@@ -1,0 +1,61 @@
+# =============================================================================
+# ReviewPilot Configuration
+# =============================================================================
+# Place this file as `.reviewpilot.yml` in the root of your repository.
+# All settings are optional — sensible defaults are used when omitted.
+
+# ---------------------------------------------------------------------------
+# LLM Provider Settings
+# ---------------------------------------------------------------------------
+llm:
+  # Which LLM provider to use.  Supported: "openai", "anthropic", "azure",
+  # or any provider supported by LiteLLM.
+  provider: "openai"
+
+  # Model identifier.  Must be a valid model name for the chosen provider.
+  model: "gpt-4o-mini"
+
+  # Name of the environment variable that holds your API key.
+  # ReviewPilot never reads the key directly — only the env-var name.
+  api_key_env: "OPENAI_API_KEY"
+
+# ---------------------------------------------------------------------------
+# Sandbox (Docker) Settings
+# ---------------------------------------------------------------------------
+sandbox:
+  # Set to false to skip sandbox verification entirely.
+  enabled: true
+
+  # Docker image used to run the verification sandbox.
+  docker_image: "python:3.11-slim"
+
+  # Command executed inside the container to verify the suggested changes.
+  test_command: "pip install -r requirements.txt && pytest"
+
+  # Maximum wall-clock time (seconds) the sandbox is allowed to run.
+  timeout_seconds: 120
+
+  # Docker memory limit for the sandbox container (e.g. "512m", "1g").
+  memory_limit: "1g"
+
+# ---------------------------------------------------------------------------
+# Review Behaviour
+# ---------------------------------------------------------------------------
+review:
+  # Maximum number of review comments posted per PR.
+  max_comments: 15
+
+  # Minimum severity for a finding to be posted.
+  # Options: "critical", "major", "minor", "suggestion"
+  severity_threshold: "minor"
+
+# ---------------------------------------------------------------------------
+# Ignore Patterns
+# ---------------------------------------------------------------------------
+# Glob patterns for files that should be excluded from review.
+ignore:
+  - "*.lock"
+  - "package-lock.json"
+  - "node_modules/**"
+  - "dist/**"
+  - "*.generated.*"
