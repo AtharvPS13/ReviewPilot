@@ -300,7 +300,7 @@ def analyze_python_file(source_code: str, file_path: str = "") -> FileAnalysis:
 def analyze_file(source_code: str, file_path: str) -> Optional[FileAnalysis]:
     """Analyze a source file using the appropriate language parser.
 
-    Currently supports Python. Other languages will be added in Week 5.
+    Supports Python, JavaScript, and TypeScript. More languages planned.
 
     Args:
         source_code: The source code as a string
@@ -315,6 +315,10 @@ def analyze_file(source_code: str, file_path: str) -> Optional[FileAnalysis]:
 
     if language == "python":
         return analyze_python_file(source_code, file_path)
+
+    if language in ("javascript", "typescript"):
+        from reviewpilot.analysis.js_analyzer import analyze_js_file
+        return analyze_js_file(source_code, file_path, is_typescript=(language == "typescript"))
 
     # Other languages to be added later
     return None
