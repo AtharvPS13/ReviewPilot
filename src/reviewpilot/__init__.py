@@ -1,5 +1,13 @@
-"""ReviewPilot — AI code review GitHub Action with sandbox verification."""
+"""ReviewPilot - AI code review with sandbox verification.
 
-from __future__ import annotations
-
+The only AI code reviewer that proves its suggestions work before posting them.
+"""
 __version__ = "0.1.0"
+
+from reviewpilot.config import ReviewPilotConfig, load_config
+
+__all__ = [
+    "__version__",
+    "ReviewPilotConfig",
+    "load_config",
+]
