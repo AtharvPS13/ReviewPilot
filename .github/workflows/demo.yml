@@ -1,0 +1,24 @@
+name: ReviewPilot Demo
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ReviewPilot on this PR
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+          test-command: "pip install -e '.[dev]' && pytest tests/ -x"
+          max-comments: "10"
+          severity-threshold: "minor"

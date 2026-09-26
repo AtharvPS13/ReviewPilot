@@ -1,0 +1,61 @@
+name: 'ReviewPilot'
+description: 'AI code review with sandbox verification — proves suggestions work before posting them'
+author: 'AtharvPS13'
+
+branding:
+  icon: 'search'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  
+  llm-provider:
+    description: 'LLM provider (openai, anthropic, ollama, gemini)'
+    required: false
+    default: 'openai'
+  
+  llm-model:
+    description: 'LLM model name'
+    required: false
+    default: 'gpt-4o-mini'
+  
+  llm-api-key:
+    description: 'LLM API key (or set via environment variable)'
+    required: false
+  
+  sandbox-enabled:
+    description: 'Enable Docker sandbox verification'
+    required: false
+    default: 'true'
+  
+  test-command:
+    description: 'Command to run tests in sandbox'
+    required: false
+    default: 'echo "No test command configured"'
+  
+  max-comments:
+    description: 'Maximum inline comments per review'
+    required: false
+    default: '15'
+  
+  severity-threshold:
+    description: 'Minimum severity to post (critical, major, minor, nitpick)'
+    required: false
+    default: 'minor'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    GITHUB_TOKEN: ${{ inputs.github-token }}
+    PR_NUMBER: ${{ github.event.pull_request.number }}
+    LLM_PROVIDER: ${{ inputs.llm-provider }}
+    LLM_MODEL: ${{ inputs.llm-model }}
+    OPENAI_API_KEY: ${{ inputs.llm-api-key }}
+    SANDBOX_ENABLED: ${{ inputs.sandbox-enabled }}
+    TEST_COMMAND: ${{ inputs.test-command }}
+    MAX_COMMENTS: ${{ inputs.max-comments }}
+    SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
