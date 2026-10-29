@@ -4,6 +4,7 @@ Parses source code into ASTs and extracts function/class information
 with precise line numbers for mapping back to diff changes.
 Currently supports Python. Other languages will be added in Week 5.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -184,7 +185,9 @@ def _extract_function_info(
     docstring = _extract_docstring(body_node, source) if body_node else None
     decorators = _extract_decorators(node, source)
 
-    is_async = node.type in ("async_function_definition",)
+    is_async = node.type in ("async_function_definition",) or any(
+        c.type == "async" for c in node.children
+    )
 
     # Use the decorated_definition's line range if it exists
     display_node = node
@@ -253,7 +256,9 @@ def analyze_python_file(source_code: str, file_path: str = "") -> FileAnalysis:
 
             elif actual_child.type == "class_definition":
                 cls_name_node = actual_child.child_by_field_name("name")
-                cls_name = _extract_text(cls_name_node, source_bytes) if cls_name_node else "Unknown"
+                cls_name = (
+                    _extract_text(cls_name_node, source_bytes) if cls_name_node else "Unknown"
+                )
 
                 # Extract base classes
                 bases: list[str] = []
@@ -318,6 +323,7 @@ def analyze_file(source_code: str, file_path: str) -> Optional[FileAnalysis]:
 
     if language in ("javascript", "typescript"):
         from reviewpilot.analysis.js_analyzer import analyze_js_file
+
         return analyze_js_file(source_code, file_path, is_typescript=(language == "typescript"))
 
     # Other languages to be added later

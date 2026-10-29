@@ -4,6 +4,7 @@ Provides a local review mode for testing and a GitHub Action mode.
 Users can run ReviewPilot locally on a diff file or against a PR
 without deploying the Action.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -147,18 +148,22 @@ def cmd_review(args: argparse.Namespace) -> int:
     # Run deterministic checks
     for file_diff in filtered.files:
         source_path = repo_path / file_diff.path
-        if not source_path.exists():
-            continue
-
-        source = source_path.read_text(encoding="utf-8")
-        source_lines = source.splitlines()
         changed_lines_map: dict[int, str] = {}
-        for ln in file_diff.changed_lines:
-            if 1 <= ln <= len(source_lines):
-                changed_lines_map[ln] = source_lines[ln - 1]
+        if source_path.exists():
+            source = source_path.read_text(encoding="utf-8")
+            source_lines = source.splitlines()
+            for ln in file_diff.changed_lines:
+                if 1 <= ln <= len(source_lines):
+                    changed_lines_map[ln] = source_lines[ln - 1]
+        else:
+            for hunk in file_diff.hunks:
+                for change in hunk.changes:
+                    if change.change_type == "add":
+                        changed_lines_map[change.line_number] = change.content
 
-        det_issues = run_deterministic_checks(file_diff.path, changed_lines_map, min_severity)
-        all_issues.extend(det_issues)
+        if changed_lines_map:
+            det_issues = run_deterministic_checks(file_diff.path, changed_lines_map, min_severity)
+            all_issues.extend(det_issues)
 
     # LLM review (unless deterministic-only)
     if not args.deterministic_only:
@@ -167,9 +172,18 @@ def cmd_review(args: argparse.Namespace) -> int:
         file_contexts: list[str] = []
         for file_diff in filtered.files:
             source_path = repo_path / file_diff.path
-            if not source_path.exists():
+            if source_path.exists():
+                source = source_path.read_text(encoding="utf-8")
+            else:
+                diff_lines = [
+                    c.content
+                    for h in file_diff.hunks
+                    for c in h.changes
+                    if c.change_type in ("add", "context")
+                ]
+                source = "\n".join(diff_lines)
+            if not source:
                 continue
-            source = source_path.read_text(encoding="utf-8")
             ctx = build_file_context(file_diff, source)
             if ctx:
                 file_contexts.append(ctx.to_prompt_text())
@@ -206,18 +220,22 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     for file_diff in filtered.files:
         source_path = repo_path / file_diff.path
-        if not source_path.exists():
-            continue
-
-        source = source_path.read_text(encoding="utf-8")
-        source_lines = source.splitlines()
         changed_lines_map: dict[int, str] = {}
-        for ln in file_diff.changed_lines:
-            if 1 <= ln <= len(source_lines):
-                changed_lines_map[ln] = source_lines[ln - 1]
+        if source_path.exists():
+            source = source_path.read_text(encoding="utf-8")
+            source_lines = source.splitlines()
+            for ln in file_diff.changed_lines:
+                if 1 <= ln <= len(source_lines):
+                    changed_lines_map[ln] = source_lines[ln - 1]
+        else:
+            for hunk in file_diff.hunks:
+                for change in hunk.changes:
+                    if change.change_type == "add":
+                        changed_lines_map[change.line_number] = change.content
 
-        det_issues = run_deterministic_checks(file_diff.path, changed_lines_map, min_severity)
-        all_issues.extend(det_issues)
+        if changed_lines_map:
+            det_issues = run_deterministic_checks(file_diff.path, changed_lines_map, min_severity)
+            all_issues.extend(det_issues)
 
     _print_issues(all_issues)
     return 1 if any(i.severity in (Severity.CRITICAL, Severity.MAJOR) for i in all_issues) else 0
@@ -240,7 +258,9 @@ def cmd_parse(args: argparse.Namespace) -> int:
 
         print(f"\n  {f.path}{status}")
         print(f"    Hunks: {len(f.hunks)}")
-        print(f"    Changed lines: {sorted(f.changed_lines)[:20]}{'...' if len(f.changed_lines) > 20 else ''}")
+        print(
+            f"    Changed lines: {sorted(f.changed_lines)[:20]}{'...' if len(f.changed_lines) > 20 else ''}"
+        )
 
     return 0
 
@@ -266,7 +286,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     for func in result.functions:
         method_label = f" (method of {func.class_name})" if func.is_method else ""
         async_label = "async " if func.is_async else ""
-        print(f"  {async_label}{func.name}{func.parameters} [{func.start_line}-{func.end_line}]{method_label}")
+        print(
+            f"  {async_label}{func.name}{func.parameters} [{func.start_line}-{func.end_line}]{method_label}"
+        )
 
     print(f"\nClasses: {len(result.classes)}")
     for cls in result.classes:
@@ -288,16 +310,18 @@ def _print_issues(issues: list[CodeReviewIssue]) -> None:
 
     severity_colors = {
         Severity.CRITICAL: "\033[91m",  # Red
-        Severity.MAJOR: "\033[93m",     # Yellow
-        Severity.MINOR: "\033[96m",     # Cyan
-        Severity.NITPICK: "\033[90m",   # Gray
+        Severity.MAJOR: "\033[93m",  # Yellow
+        Severity.MINOR: "\033[96m",  # Cyan
+        Severity.NITPICK: "\033[90m",  # Gray
     }
     reset = "\033[0m"
 
     print(f"\nFound {len(issues)} issue(s):\n")
     for i, issue in enumerate(issues, 1):
         color = severity_colors.get(issue.severity, "")
-        print(f"  {color}[{issue.severity.value.upper()}]{reset} {issue.file_path}:{issue.start_line}")
+        print(
+            f"  {color}[{issue.severity.value.upper()}]{reset} {issue.file_path}:{issue.start_line}"
+        )
         print(f"    {issue.explanation}")
         if issue.replacement_code:
             print(f"    Suggested fix available")

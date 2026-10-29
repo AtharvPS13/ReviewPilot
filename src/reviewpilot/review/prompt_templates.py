@@ -4,6 +4,7 @@ Structured prompts designed for consistent, high-quality code review.
 The system prompt is static (cache-eligible), while the user prompt
 is dynamically built from diff context.
 """
+
 from __future__ import annotations
 
 SYSTEM_PROMPT = """\
@@ -67,10 +68,10 @@ def build_review_prompt(file_contexts: list[str], pr_title: str = "", pr_body: s
 
     if pr_title:
         parts.append(f"## Pull Request: {pr_title}")
-        if pr_body:
-            # Truncate long PR bodies to save tokens
-            body = pr_body[:500] + "..." if len(pr_body) > 500 else pr_body
-            parts.append(f"\n{body}\n")
+    if pr_body:
+        # Truncate long PR bodies to save tokens
+        body = pr_body[:500] + "..." if len(pr_body) > 500 else pr_body
+        parts.append(f"\n{body}\n")
 
     parts.append("## Code Changes to Review\n")
     parts.append("\n---\n".join(file_contexts))
