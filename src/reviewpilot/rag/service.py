@@ -64,6 +64,23 @@ class OpenAIEmbedder:
             json={"model": self.model, "dimensions": DIMENSIONS, "input": text},
             timeout=10, trust_env=False,
         )
+        if not response.is_success:
+            code = None
+            try:
+                payload = response.json()
+                error = payload.get("error") if isinstance(payload, dict) else None
+                if isinstance(error, dict):
+                    code = error.get("code")
+            except ValueError:
+                pass
+            known_codes = (
+                "invalid_api_key", "insufficient_quota", "rate_limit_exceeded",
+                "credit_balance_exhausted", "project_spend_limit_exceeded",
+                "organization_usage_limit_exceeded", "organization_spend_limit_exceeded",
+                "model_not_found", "insufficient_permissions",
+            )
+            logger.error("OpenAI embeddings failed (HTTP %d, code=%s)", response.status_code,
+                         code if code in known_codes else "unavailable")
         response.raise_for_status()
         return response.json()["data"][0]["embedding"]
 

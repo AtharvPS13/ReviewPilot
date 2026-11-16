@@ -141,6 +141,23 @@ def test_openai_embedding_uses_pgvector_dimensions_for_documents_and_queries(mon
     ]
 
 
+@pytest.mark.parametrize(("code", "logged"), [
+    ("insufficient_quota", "insufficient_quota"), ("private-value", "unavailable"),
+])
+def test_openai_embedding_failure_logs_only_safe_diagnostics(monkeypatch, caplog, code, logged):
+    def respond(url, **kwargs):
+        return httpx.Response(429, request=httpx.Request("POST", url), json={
+            "error": {"code": code, "message": "secret response detail"},
+        })
+
+    monkeypatch.setattr(httpx, "post", respond)
+    with pytest.raises(httpx.HTTPStatusError):
+        OpenAIEmbedder("secret-fixture-key").embed("document")
+    assert f"HTTP 429, code={logged}" in caplog.text
+    assert "secret" not in caplog.text
+    assert "private-value" not in caplog.text
+
+
 @pytest.mark.asyncio
 async def test_reference_data_and_citation_allowlist(monkeypatch):
     ref = next(ref for ref, _ in index_items(fixture_snapshot()) if ref.locator == "L3-L5")
