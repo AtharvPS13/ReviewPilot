@@ -1,0 +1,14 @@
+[
+  {
+    "id": "job-utc",
+    "title": "Job timestamps",
+    "decision": "Jobs must generate timestamps with datetime.now(timezone.utc) so each timestamp is timezone-aware.",
+    "applies_to": ["jobs"]
+  },
+  {
+    "id": "metrics-prefix",
+    "title": "Metrics prefix",
+    "decision": "All exported metrics must use the reviewpilot_ prefix.",
+    "applies_to": ["metrics"]
+  }
+]

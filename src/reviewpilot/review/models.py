@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class Severity(str, Enum):
@@ -100,6 +100,20 @@ class VerificationStatus(str, Enum):
     FAILED = "failed"                  # Tests failed even after repair attempt
     SKIPPED = "skipped"                # No replacement code / sandbox disabled
     ERROR = "error"                    # Docker/system error during verification
+
+
+class GuidanceIssue(CodeReviewIssue):
+    repository_convention: bool = False
+    guidance_id: str | None = None
+    _citation: tuple[str, str] | None = PrivateAttr(default=None)
+
+    @property
+    def citation(self) -> tuple[str, str] | None:
+        return self._citation
+
+
+class GuidanceReviewResponse(PRReviewResponse):
+    issues: list[GuidanceIssue] = Field(default_factory=list)
 
 
 class VerifiedIssue(BaseModel):

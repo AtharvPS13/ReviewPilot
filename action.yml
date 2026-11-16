@@ -46,6 +46,20 @@ inputs:
     required: false
     default: 'minor'
 
+  rag-url:
+    description: 'Optional trusted Render or Cloud Run URL for repository guidance'
+    required: false
+  rag-api-token:
+    description: 'Read-only bearer token for the Render guidance service'
+    required: false
+  rag-id-token:
+    description: 'Short-lived Google identity token for the guidance service audience'
+    required: false
+  rag-timeout:
+    description: 'Maximum seconds to wait for repository guidance'
+    required: false
+    default: '8'
+
 runs:
   using: 'docker'
   image: 'Dockerfile'
@@ -59,3 +73,7 @@ runs:
     TEST_COMMAND: ${{ inputs.test-command }}
     MAX_COMMENTS: ${{ inputs.max-comments }}
     SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
+    REVIEWPILOT_RAG_URL: ${{ inputs.rag-url }}
+    REVIEWPILOT_RAG_API_TOKEN: ${{ inputs.rag-api-token }}
+    REVIEWPILOT_RAG_TOKEN: ${{ inputs.rag-id-token }}
+    REVIEWPILOT_RAG_TIMEOUT: ${{ inputs.rag-timeout }}

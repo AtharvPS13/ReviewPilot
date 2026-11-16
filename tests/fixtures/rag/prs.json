@@ -1,0 +1,34 @@
+[
+  {
+    "name": "api_error",
+    "path": "api/handler.py",
+    "old": "def handle():\n    return ok()\n",
+    "new": "def handle():\n    return {'message': 'Invalid input'}  # error response\n",
+    "expected_locator": "L3-L5",
+    "violation": true
+  },
+  {
+    "name": "naive_job_time",
+    "path": "jobs/schedule.py",
+    "old": "def scheduled_at():\n    return 0\n",
+    "new": "def scheduled_at():\n    return datetime.now()  # job timestamp\n",
+    "expected_locator": "job-utc",
+    "violation": true
+  },
+  {
+    "name": "compliant_api",
+    "path": "api/handler.py",
+    "old": "def handle():\n    return ok()\n",
+    "new": "def handle():\n    return make_error('INVALID', 'Invalid input')  # error response\n",
+    "expected_locator": "L3-L5",
+    "violation": false
+  },
+  {
+    "name": "unrelated",
+    "path": "reports/format.py",
+    "old": "def format_title():\n    return 'Old'\n",
+    "new": "def format_title():\n    return 'New'\n",
+    "expected_locator": null,
+    "violation": false
+  }
+]

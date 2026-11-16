@@ -1,0 +1,6 @@
+{
+  "sources": [
+    {"path": "tests/fixtures/rag/api-guide.md", "applies_to": ["api"]},
+    {"path": "tests/fixtures/rag/decisions.json"}
+  ]
+}

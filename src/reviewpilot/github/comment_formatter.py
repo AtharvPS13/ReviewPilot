@@ -7,11 +7,14 @@ Also handles deduplication via hidden HTML markers.
 from __future__ import annotations
 
 import hashlib
+import re
+from html import escape
 from typing import Optional
 
 from reviewpilot.review.models import (
     Category,
     CodeReviewIssue,
+    GuidanceIssue,
     Severity,
     VerificationStatus,
     VerifiedIssue,
@@ -76,9 +79,19 @@ def format_inline_comment(verified_issue: VerifiedIssue) -> str:
 
     # Explanation
     explanation = issue.explanation
+    if isinstance(issue, GuidanceIssue):
+        # Render model prose as text. Only server-derived citations become Markdown links.
+        explanation = re.sub(r"(?:https?://|www\.)[^\s\]\)>]+", "link omitted", explanation)
+        explanation = escape(explanation).replace("\n", " ")
+        for char in "\\`*_{}[]()#!|~":
+            explanation = explanation.replace(char, "\\" + char)
 
     # Build the comment body
     parts = [marker, header, "", explanation]
+    if isinstance(issue, GuidanceIssue) and issue.citation:
+        label, url = issue.citation
+        safe_label = escape(label).replace("[", r"\[").replace("]", r"\]")
+        parts.extend(["", f"Repository guidance: [{safe_label}]({url})"])
 
     # Add replacement code as GitHub suggestion block
     replacement = verified_issue.repaired_code or issue.replacement_code

@@ -30,9 +30,11 @@ from reviewpilot.github.comment_formatter import (
 from reviewpilot.github.lifecycle import run_lifecycle
 from reviewpilot.ingestion.diff_parser import parse_unified_diff
 from reviewpilot.ingestion.file_filter import filter_patch_set
+from reviewpilot.rag.client import retrieve_guidance
 from reviewpilot.review.llm_reviewer import LLMReviewer
 from reviewpilot.review.models import (
     CodeReviewIssue,
+    GuidanceIssue,
     VerificationStatus,
     VerifiedIssue,
 )
@@ -92,6 +94,7 @@ async def run_review(
     # ── Stage 3: AST Analysis + Context Building ────────────────────
     logger.info("Stage 3: AST analysis and context building...")
     file_contexts: list[str] = []
+    guidance_queries: list[dict[str, str]] = []
     for file_diff in filtered.files:
         source = file_contents.get(file_diff.path, "")
         if not source:
@@ -100,6 +103,15 @@ async def run_review(
         context = build_file_context(file_diff, source)
         if context:
             file_contexts.append(context.to_prompt_text())
+            if file_diff.changed_lines:
+                changed = "\n".join(
+                    change.content
+                    for hunk in file_diff.hunks
+                    for change in hunk.changes
+                    if change.change_type == "add"
+                )
+                if changed.strip():
+                    guidance_queries.append({"path": file_diff.path, "context": changed[:3000]})
 
     # ── Stage 4: Deterministic Pre-Filter ───────────────────────────
     logger.info("Stage 4: Running deterministic checks...")
@@ -134,13 +146,24 @@ async def run_review(
         llm_reviewer = LLMReviewer(config.llm)
 
         pr = github_client.get_pr(repo_full_name, pr_number)
+        guidance = await retrieve_guidance(repo_full_name, guidance_queries)
         llm_response = await llm_reviewer.review(
             file_contexts=file_contexts,
             pr_title=pr.title or "",
             pr_body=pr.body or "",
+            **({"guidance": guidance, "repo_id": repo_full_name} if guidance else {}),
         )
 
-        all_issues.extend(llm_response.issues)
+        changed_lines = {file.path: file.changed_lines for file in filtered.files}
+        all_issues.extend(
+            issue for issue in llm_response.issues
+            if not isinstance(issue, GuidanceIssue) or not issue.citation
+            or (
+                issue.start_line > 0 and issue.end_line >= issue.start_line
+                and issue.start_line in changed_lines.get(issue.file_path, set())
+                and issue.end_line in changed_lines.get(issue.file_path, set())
+            )
+        )
         pr_summary = llm_response.summary
         risk_level = llm_response.risk_level
         logger.info("LLM review found %d issues", len(llm_response.issues))
