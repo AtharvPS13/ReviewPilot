@@ -35,3 +35,48 @@ jobs:
       - name: Type check with mypy
         run: mypy src/reviewpilot/ --ignore-missing-imports
         continue-on-error: true
+
+  rag-pgvector:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: reviewpilot
+          POSTGRES_USER: reviewpilot
+          POSTGRES_PASSWORD: fixture-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reviewpilot -d reviewpilot"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      REVIEWPILOT_TEST_PG_DSN: postgresql://reviewpilot:fixture-only@127.0.0.1:5432/reviewpilot
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev,rag-service]'
+      - name: Verify pgvector and the Action fixture
+        run: |
+          python -c "import os, psycopg; c = psycopg.connect(os.environ['REVIEWPILOT_TEST_PG_DSN'], autocommit=True); c.execute('CREATE EXTENSION IF NOT EXISTS vector'); c.close()"
+          python -m pytest tests/test_rag.py -o addopts=
+          docker build -t reviewpilot-action-fixture .
+          docker build -f Dockerfile.rag -t reviewpilot-rag-fixture .
+      - name: Run the Action against the local pgvector service
+        env:
+          RAG_REPO_ID: fixture/reviewpilot
+          RAG_INDEX_TOKEN: fixture-writer
+          RAG_EMBEDDER: fixture
+          RAG_MIN_SIMILARITY: '0.09'
+          REVIEWPILOT_RAG_URL: http://127.0.0.1:8080
+        run: |
+          export RAG_DATABASE_URL="$REVIEWPILOT_TEST_PG_DSN"
+          python -m reviewpilot.rag.service &
+          service_pid=$!
+          trap 'kill "$service_pid"' EXIT
+          curl -fsS --retry 10 --retry-connrefused "$REVIEWPILOT_RAG_URL/healthz"
+          python -m reviewpilot.rag.index "$RAG_REPO_ID" --revision HEAD --manifest tests/fixtures/rag/manifest.json
+          python -m tests.rag_eval --live-service

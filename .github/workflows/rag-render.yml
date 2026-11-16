@@ -1,0 +1,64 @@
+name: ReviewPilot Render evaluation
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency: render-fixture-evaluation
+    env:
+      RAG_REPO_ID: ${{ vars.REVIEWPILOT_FIXTURE_REPO }}
+      REVIEWPILOT_RAG_URL: ${{ vars.REVIEWPILOT_RAG_URL }}
+      REVIEWPILOT_RAG_TIMEOUT: '25'
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+    steps:
+      - name: Require the configured disposable repository
+        run: |
+          if [[ "${GITHUB_REPOSITORY,,}" != "$RAG_REPO_ID" ]]; then
+            echo 'Set REVIEWPILOT_FIXTURE_REPO to the lowercase owner/name of this disposable repository.'
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e .
+      - name: Warm the service and check that retrieval requires authentication
+        shell: bash
+        run: |
+          python -c 'import os; from reviewpilot.rag.client import is_render_url, service_url; url = service_url(os.environ["REVIEWPILOT_RAG_URL"]); raise SystemExit(0 if is_render_url(url) else "Use the Render HTTPS service URL")'
+          base="${REVIEWPILOT_RAG_URL%/}"
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 90 "$base/healthz"
+          status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
+            --header 'Content-Type: application/json' --data '{}' "$base/v1/retrieve")
+          test "$status" = 401
+      - name: Index the committed fixture snapshot
+        env:
+          RAG_INDEX_TOKEN: ${{ secrets.RAG_INDEX_TOKEN }}
+        run: |
+          python -m reviewpilot.rag.index "$RAG_REPO_ID" --revision "$GITHUB_SHA" \
+            --manifest tests/fixtures/rag/manifest.json
+      - name: Run the Action entry point with retrieval on and off
+        shell: bash
+        env:
+          REVIEWPILOT_RAG_API_TOKEN: ${{ secrets.REVIEWPILOT_RAG_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python -m tests.rag_eval --live-service --real-model --details | tee rag-evaluation.txt
+      - name: Write fixture results to the job summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -s rag-evaluation.txt ]]; then
+            {
+              echo '## ReviewPilot fixture evaluation'
+              echo
+              sed 's/^/    /' rag-evaluation.txt
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

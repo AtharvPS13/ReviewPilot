@@ -1,0 +1,11 @@
+*
+!Dockerfile.rag
+!pyproject.toml
+!README.md
+!src/
+!src/**
+!deploy/
+!deploy/rag/
+!deploy/rag/cloudbuild.yaml
+**/__pycache__/
+**/*.pyc

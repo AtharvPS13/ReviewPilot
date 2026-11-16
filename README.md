@@ -229,6 +229,12 @@ pytest tests/ -v
 ruff check src/ tests/
 ```
 
+## Repository-aware reviews
+
+Opt in to repository-specific guidance from Markdown and JSON with pgvector. ReviewPilot
+can cite the exact guide lines or decision behind a convention finding. See the
+[local fixture and authenticated Google Cloud deployment guide](deploy/rag/README.md).
+
 ## License
 
 MIT
